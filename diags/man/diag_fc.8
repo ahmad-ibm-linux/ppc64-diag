@@ -1,0 +1,99 @@
+.\" Copyright (C) 2026 IBM Corporation
+.\"
+.TH DIAG_FC 8 "June 2026" Linux "PowerLinux Diagnostics"
+.SH NAME
+diag_fc \- Fibre Channel diagnostics tool
+.SH SYNOPSIS
+.B diag_fc
+.RB [ \-h | \-\-help ]
+.RI [ host ...]
+.SH DESCRIPTION
+.B diag_fc
+is a diagnostic tool for monitoring Fibre Channel Host Bus Adapters (HBAs)
+on PowerVM LPAR systems. It collects health metrics, detects issues, and
+logs events to servicelog for proactive system maintenance.
+
+The tool monitors:
+.IP \(bu 2
+Link state (Online/Offline/Linkdown)
+.IP \(bu 2
+Error counters (CRC errors, link failures, loss of sync/signal)
+.IP \(bu 2
+Performance metrics (frame/word counts, throughput)
+.IP \(bu 2
+Topology changes (LIP events, fabric changes)
+.IP \(bu 2
+EEH events (PowerPC-specific hardware errors)
+
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display help message and exit.
+
+.SH ARGUMENTS
+.TP
+.I host
+One or more FC host names to check (e.g., host0, host1).
+If no hosts are specified, all FC hosts in the system will be checked.
+
+.SH EXAMPLES
+.TP
+Check all FC hosts:
+.B diag_fc
+
+.TP
+Check specific hosts:
+.B diag_fc host0 host1
+
+.SH FILES
+.TP
+.I /etc/ppc64-diag/diag_fc.config
+Configuration file for thresholds and monitoring options (installed from scripts/diag_fc.config).
+.TP
+.I /sys/class/fc_host/
+Sysfs directory containing FC host information.
+.TP
+.I /var/log/ppc64-diag/
+Log directory for diagnostic output.
+.TP
+.I /etc/cron.daily/run_diag_fc
+Cron script for periodic execution of diagnostics.
+
+.SH DIAGNOSTICS
+The tool reports the following information for each FC host:
+.IP \(bu 2
+WWPN (World Wide Port Name)
+.IP \(bu 2
+Port state
+.IP \(bu 2
+Link speed
+.IP \(bu 2
+Error counters
+.IP \(bu 2
+Health status
+
+.SH EXIT STATUS
+.TP
+.B 0
+Success - all checks passed
+.TP
+.B >0
+One or more checks failed
+
+.SH SEE ALSO
+.BR diag_nvme (8),
+.BR diag_encl (8),
+.BR servicelog (8)
+
+.SH AUTHOR
+IBM Corporation
+
+.SH REPORTING BUGS
+Report bugs to the ppc64-diag project:
+.br
+https://github.com/power-ras/ppc64-diag
+
+.SH COPYRIGHT
+Copyright \(co 2026 IBM Corporation
+.br
+This is free software; see the source for copying conditions.
