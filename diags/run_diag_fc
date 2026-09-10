@@ -1,6 +1,13 @@
 #!/bin/bash
-# Script to run FC diagnostics periodically
+#
+# run_diag_fc - cron script placeholder for diag_fc
+#
+# diag_fc is a passive evidence collector, not a periodic health monitor.
+# It is invoked externally (by the EEH subsystem or platform firmware)
+# with the affected PCI address when a permanent FC adapter failure is
+# detected.  There is no meaningful action to take on a cron schedule.
+#
+# This script is intentionally a no-op.
 
-/usr/sbin/diag_fc
-
-# Made with Bob
+# Exit gracefully
+exit 0

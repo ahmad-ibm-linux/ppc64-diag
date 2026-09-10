@@ -55,10 +55,9 @@ diags_diag_fc_SOURCES = diags/diag_fc.c \
 			common/platform.c \
 			common/utils.c    \
 			$(diag_fc_h_files)
-diags_diag_fc_LDADD = -lservicelog
-diags_diag_fc_CFLAGS = $(AM_CFLAGS)
+diags_diag_fc_CFLAGS = $(AM_CFLAGS) -Wno-stringop-truncation
 
-dist_man_MANS += diags/man/diag_encl.8 diags/man/encl_led.8 diags/man/diag_nvme.8 diags/man/diag_fc.8
+dist_man_MANS += diags/man/diag_encl.8 diags/man/encl_led.8 diags/man/diag_nvme.8
 
 DIAG_CRONTAB_SCRIPT = diags/run_diag_encl diags/run_diag_nvme diags/run_diag_fc
 

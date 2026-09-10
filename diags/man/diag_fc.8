@@ -1,99 +1,212 @@
+.\"
 .\" Copyright (C) 2026 IBM Corporation
 .\"
-.TH DIAG_FC 8 "June 2026" Linux "PowerLinux Diagnostics"
+.TH "DIAG_FC" "8" "2026" "Linux" "PowerLinux Diagnostic Tools"
+.hy
 .SH NAME
-diag_fc \- Fibre Channel diagnostics tool
+.PP
+diag_fc \- collect FC adapter failure evidence on PowerVM LPARs
 .SH SYNOPSIS
-.B diag_fc
-.RB [ \-h | \-\-help ]
-.RI [ host ...]
+.PP
+\f[B]diag_fc\f[] \f[B]\-p\f[] \f[I]pci_addr\f[]
+[\f[B]\-t\f[] \f[I]type\f[]]
+[\f[B]\-s\f[] \f[I]source\f[]]
+[\f[B]\-r\f[] \f[I]reason\f[]]
+[\f[B]\-T\f[] \f[I]timestamp\f[]]
+[\f[B]\-o\f[] \f[I]outfile\f[]]
+.PD 0
+.P
+.PD
+\f[B]diag_fc\f[] \f[B]\-\-help\f[]
 .SH DESCRIPTION
-.B diag_fc
-is a diagnostic tool for monitoring Fibre Channel Host Bus Adapters (HBAs)
-on PowerVM LPAR systems. It collects health metrics, detects issues, and
-logs events to servicelog for proactive system maintenance.
-
-The tool monitors:
-.IP \(bu 2
-Link state (Online/Offline/Linkdown)
-.IP \(bu 2
-Error counters (CRC errors, link failures, loss of sync/signal)
-.IP \(bu 2
-Performance metrics (frame/word counts, throughput)
-.IP \(bu 2
-Topology changes (LIP events, fabric changes)
-.IP \(bu 2
-EEH events (PowerPC-specific hardware errors)
-
+.PP
+\f[B]diag_fc\f[] is a passive evidence collector for Fibre Channel Host
+Bus Adapter (HBA) permanent failures on PowerVM LPAR systems.
+It is invoked by an external component \(em such as the EEH subsystem or
+platform firmware \(em after a permanent FC adapter failure has been
+confirmed.
+It collects adapter identity, port state, driver information, VPD data,
+IBM location code, and machine context into a structured JSON report.
+.PP
+\f[B]diag_fc\f[] does \f[B]not\f[] detect failures, monitor FC health,
+or run continuously.
+All sysfs and device\-tree access is strictly read\-only.
+If the adapter has already disappeared from sysfs by the time
+\f[B]diag_fc\f[] is invoked, it collects whatever partial data remains
+and writes a partial report rather than failing.
+.PP
+The JSON report is written to a file or to stdout and is intended for
+consumption by support tooling and call\-home infrastructure.
 .SH OPTIONS
 .TP
-.BR \-h ", " \-\-help
-Display help message and exit.
-
-.SH ARGUMENTS
+.B \-p \f[I]pci_addr\f[]
+.PD 0
+.P
+.PD
+PCI address of the affected adapter function in
+\f[I]DDDD:BB:DD.F\f[] format (e.g.\& \f[I]0155:90:00.0\f[]).
+This option is required.
+\f[B]diag_fc\f[] automatically discovers all sibling PCI functions on
+the same physical slot and collects per\-port data for each.
 .TP
-.I host
-One or more FC host names to check (e.g., host0, host1).
-If no hosts are specified, all FC hosts in the system will be checked.
-
-.SH EXAMPLES
+.B \-t \f[I]type\f[]
+.PD 0
+.P
+.PD
+Trigger type string recorded in the report.
+Default: \f[B]EEH_PERMANENT_FAILURE\f[].
 .TP
-Check all FC hosts:
-.B diag_fc
-
+.B \-s \f[I]source\f[]
+.PD 0
+.P
+.PD
+Trigger source string (e.g.\& \f[I]platform\f[], \f[I]manual\f[]).
+Default: \f[B]manual\f[].
 .TP
-Check specific hosts:
-.B diag_fc host0 host1
-
-.SH FILES
+.B \-r \f[I]reason\f[]
+.PD 0
+.P
+.PD
+Human\-readable failure reason recorded in the report.
 .TP
-.I /etc/ppc64-diag/diag_fc.config
-Configuration file for thresholds and monitoring options (installed from scripts/diag_fc.config).
+.B \-T \f[I]timestamp\f[]
+.PD 0
+.P
+.PD
+Trigger event time in ISO\ 8601 UTC format
+(e.g.\& \f[I]2026\-06\-24T18:30:00Z\f[]).
+If omitted, the collection time is used.
 .TP
-.I /sys/class/fc_host/
-Sysfs directory containing FC host information.
+.B \-o \f[I]outfile\f[]
+.PD 0
+.P
+.PD
+Path of the JSON output file.
+Use \f[B]\-\f[] or omit this option to write to stdout.
+Default: stdout.
 .TP
-.I /var/log/ppc64-diag/
-Log directory for diagnostic output.
-.TP
-.I /etc/cron.daily/run_diag_fc
-Cron script for periodic execution of diagnostics.
-
-.SH DIAGNOSTICS
-The tool reports the following information for each FC host:
-.IP \(bu 2
-WWPN (World Wide Port Name)
-.IP \(bu 2
-Port state
-.IP \(bu 2
-Link speed
-.IP \(bu 2
-Error counters
-.IP \(bu 2
-Health status
-
+.B \-h, \-\-help
+.PD 0
+.P
+.PD
+Print usage information and exit.
 .SH EXIT STATUS
 .TP
 .B 0
-Success - all checks passed
+Report written successfully.
 .TP
-.B >0
-One or more checks failed
-
-.SH SEE ALSO
-.BR diag_nvme (8),
-.BR diag_encl (8),
-.BR servicelog (8)
-
-.SH AUTHOR
-IBM Corporation
-
+.B 1
+Invalid command\-line usage or unsupported platform.
+.TP
+.B 2
+Fatal collection error (pci_addr or output struct is NULL).
+.TP
+.B 3
+Report\-writing error (output file could not be opened or written).
+.SH EXAMPLES
+.PP
+Collect evidence after an EEH permanent failure detected by the platform:
+.PP
+.nf
+\f[B]diag_fc \-p 0155:90:00.0 \e
+        \-t EEH_PERMANENT_FAILURE \e
+        \-s platform \e
+        \-r "I/O adapter permanently unavailable" \e
+        \-o /var/log/ppc64\-diag/fc_incident.json\f[]
+.fi
+.PP
+Quick manual smoke test against a healthy adapter (stdout):
+.PP
+.nf
+\f[B]diag_fc \-p 0155:90:00.0 \-t TEST \-s manual\f[]
+.fi
+.SH OUTPUT FORMAT
+.PP
+The report is a JSON object with the following top\-level sections:
+.TP
+.B schema_version
+Format version string (\f[I]"1.0"\f[]).
+.TP
+.B trigger
+Trigger type, source, PCI function, reason, reference, and timestamp
+supplied by the caller.
+.TP
+.B machine
+Hostname, OS name, kernel release, kernel build string, and architecture.
+.TP
+.B adapter
+Symbolic name, PCI vendor/device/subsystem IDs, driver name and version,
+IBM location code, VPD collection status, and VPD fields (part number,
+FRU part number, serial number, CCIN, feature code, firmware level,
+EC level).
+.TP
+.B ports
+Array of per\-port records.
+Each entry contains the PCI function address, fc_host name, presence
+flags (\f[I]pci_function_present\f[], \f[I]fc_host_present\f[]),
+WWPN, WWNN, port state, port type, port ID, speed, supported speeds,
+and fabric name.
+.TP
+.B collection
+UTC timestamp of when evidence collection completed.
+.SH FILES
+.TP
+.B \f[I]/etc/ppc64\-diag/diag_fc.config\f[]
+Optional configuration file.
+\f[B]diag_fc\f[] operates correctly if this file is absent.
+No threshold or monitoring settings are currently used; the file is
+reserved for future use (e.g.\& output directory, report size limit).
+.RS
+.RE
+.TP
+.B \f[I]/sys/class/fc_host/\f[]
+Sysfs directory from which per\-port FC attributes are read
+(WWPN, WWNN, port state, speed, fabric name, symbolic name).
+.RS
+.RE
+.TP
+.B \f[I]/sys/bus/pci/devices/\f[]
+Sysfs directory from which PCI identity attributes and binary VPD
+are read.
+.RS
+.RE
+.TP
+.B \f[I]/sys/firmware/devicetree/base/\f[]
+Device tree used to resolve the IBM location code for the adapter slot.
+.RS
+.RE
+.TP
+.B \f[I]/etc/cron.daily/run_diag_fc\f[]
+Installed cron script.
+This script is a no\-op placeholder.
+\f[B]diag_fc\f[] is a passive collector and has no meaningful periodic
+action; it must be invoked with \f[B]\-p\f[] by an external trigger.
+.RS
+.RE
+.SH NOTES
+.PP
+\f[B]diag_fc\f[] only runs on PowerVM LPAR systems
+(\f[I]PLATFORM_PSERIES_LPAR\f[]).
+It exits with status\ 1 on any other platform.
+.PP
+VPD keyword\-to\-field mappings (MN\[->]serial_number, CC\[->]ccin,
+PN\[->]part_number, FN\[->]fru_part_number, RM\[->]firmware_level,
+EC\[->]ec_level) are candidates pending verification against the
+binary VPD of each target adapter model.
+If the \f[I]vpd_status\f[] field in the report is \f[I]"parse_error"\f[]
+or \f[I]"unavailable"\f[], run
+.B lspci\ \-vv\ \f[I]pci_addr\f[]
+to inspect the raw VPD keywords and compare against the mappings in
+\f[B]collect_vpd()\f[] in \f[I]diag_fc.c\f[].
 .SH REPORTING BUGS
-Report bugs to the ppc64-diag project:
-.br
-https://github.com/power-ras/ppc64-diag
-
-.SH COPYRIGHT
-Copyright \(co 2026 IBM Corporation
-.br
-This is free software; see the source for copying conditions.
+.PP
+Patches and issues may be submitted at
+https://github.com/power\-ras/ppc64\-diag/
+.SH SEE ALSO
+.PP
+\f[B]diag_nvme\f[](8),
+\f[B]diag_encl\f[](8),
+\f[B]servicelog\f[](8)
+.SH AUTHORS
+.PP
+IBM Corporation
