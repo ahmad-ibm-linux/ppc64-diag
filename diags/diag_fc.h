@@ -40,7 +40,6 @@
 #define FIELD_LEN		64	/* generic short field */
 #define LOCATION_LENGTH		80
 #define DESCR_LENGTH		1024
-#define FC_HOST_STATS_ATTRS	2	/* error_frames, dumped_frames */
 #define MAX_REMOTE_PORTS	32
 #define MAX_MPATH_DEVICES	16
 #define MPATH_DEV_NAME_LEN	32

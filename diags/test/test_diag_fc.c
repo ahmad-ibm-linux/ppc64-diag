@@ -165,7 +165,7 @@ static void test_write_null_args(void)
 {
 	printf("\n[5] write_fc_report — NULL argument rejection\n");
 
-	int rc = write_fc_report(NULL, "-");
+	int rc = write_fc_report(NULL, "-", NULL);
 	CHECK(rc == -1, "NULL inc returns -1");
 }
 
@@ -203,7 +203,7 @@ static void test_write_zeroed_struct(void)
 	}
 	close(tmpfd);
 
-	int rc = write_fc_report(&inc, tmppath);
+	int rc = write_fc_report(&inc, tmppath, NULL);
 	CHECK(rc == 0, "write_fc_report succeeds on zeroed struct");
 
 	/* Verify the file starts with '{' and ends with '}' */

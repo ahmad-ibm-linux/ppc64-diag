@@ -608,6 +608,7 @@ static void collect_mpath_devices(struct fc_incident *inc,
 	DIR *dm_dir, *slave_dir;
 	struct dirent *dm_de, *sl_de;
 	char slave_path[PATH_MAX];
+	char entry_path[PATH_MAX];
 	char resolved[PATH_MAX];
 	int i, rc;
 
@@ -648,14 +649,14 @@ static void collect_mpath_devices(struct fc_incident *inc,
 			 * and check whether any collected PCI address appears
 			 * in that path.
 			 */
-			rc = snprintf(slave_path, sizeof(slave_path),
+			rc = snprintf(entry_path, sizeof(entry_path),
 				      "%s/%s/slaves/%s",
 				      BLOCK_SYS_PATH, dm_de->d_name,
 				      sl_de->d_name);
-			if (rc <= 0 || (size_t)rc >= sizeof(slave_path))
+			if (rc <= 0 || (size_t)rc >= sizeof(entry_path))
 				continue;
 
-			if (realpath(slave_path, resolved) == NULL)
+			if (realpath(entry_path, resolved) == NULL)
 				continue;
 
 			for (i = 0; i < inc->num_ports; i++) {
