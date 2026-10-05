@@ -488,6 +488,105 @@ static void collect_port(const char *pci_addr, struct fc_port *port)
 }
 
 /* ------------------------------------------------------------------ */
+/* Remote port collection                                               */
+/* ------------------------------------------------------------------ */
+
+#define FC_RPORT_SYS_PATH	"/sys/class/fc_remote_ports"
+
+/*
+ * collect_remote_ports - Scan for remote ports reachable via any collected
+ *                        fc_host and fill inc->remote_ports[].
+ *
+ * Iterates /sys/class/fc_remote_ports/ looking for entries of the form
+ * rport-X:Y-Z where X matches the host number of any port in inc->ports[].
+ * Fills minimal fields: port_id, port_name, port_state, roles.
+ *
+ * Called after all fc_port entries have been populated in inc.
+ */
+static void collect_remote_ports(struct fc_incident *inc)
+{
+	DIR *dir;
+	struct dirent *de;
+	char path[PATH_MAX];
+	char host_num[16];
+	int i, rc;
+
+	if (!inc)
+		return;
+
+	inc->num_remote_ports = 0;
+
+	dir = opendir(FC_RPORT_SYS_PATH);
+	if (!dir)
+		return;
+
+	while ((de = readdir(dir)) != NULL &&
+	       inc->num_remote_ports < MAX_REMOTE_PORTS) {
+		if (!strcmp(de->d_name, ".") || !strcmp(de->d_name, ".."))
+			continue;
+
+		/*
+		 * rport name format: "rport-H:B-I"
+		 * H is the host number.  Match against every fc_host in inc.
+		 */
+		for (i = 0; i < inc->num_ports; i++) {
+			if (!inc->ports[i].fc_host_present)
+				continue;
+
+			/*
+			 * fc_host is "hostN"; extract "N" to compare
+			 * against the host number embedded in rport name.
+			 */
+			if (sscanf(inc->ports[i].fc_host, "host%15s",
+				   host_num) != 1)
+				continue;
+
+			/*
+			 * rport entry starts with "rport-<host_num>:"
+			 */
+			{
+				char prefix[32];
+
+				rc = snprintf(prefix, sizeof(prefix),
+					      "rport-%s:", host_num);
+				if (rc <= 0 || (size_t)rc >= sizeof(prefix))
+					continue;
+				if (strncmp(de->d_name, prefix,
+					    strlen(prefix)) != 0)
+					continue;
+			}
+
+			/* Match found — fill the remote port entry */
+			{
+				struct fc_remote_port *rp =
+					&inc->remote_ports[inc->num_remote_ports];
+
+#define RDRP(attr, field) \
+	do { \
+		rc = snprintf(path, sizeof(path), "%s/%s/%s", \
+			      FC_RPORT_SYS_PATH, de->d_name, (attr)); \
+		if (rc > 0 && (size_t)rc < sizeof(path)) \
+			safe_read(path, rp->field, sizeof(rp->field)); \
+		else \
+			snprintf(rp->field, sizeof(rp->field), "unknown"); \
+	} while (0)
+
+				RDRP("port_id",    port_id);
+				RDRP("port_name",  port_name);
+				RDRP("port_state", port_state);
+				RDRP("roles",      roles);
+
+#undef RDRP
+
+				inc->num_remote_ports++;
+			}
+			break;	/* matched this de against one host; move on */
+		}
+	}
+	closedir(dir);
+}
+
+/* ------------------------------------------------------------------ */
 /* VPD collection                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -960,6 +1059,9 @@ int collect_fc_incident(const char *pci_addr,
 			inc->num_ports++;
 		}
 	}
+
+	/* Remote ports */
+	collect_remote_ports(inc);
 
 	return 0;
 }
