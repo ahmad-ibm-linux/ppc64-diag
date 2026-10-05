@@ -55,14 +55,11 @@
 #include "diag_fc.h"
 #include "platform.h"
 #include "utils.h"
-#include <ctype.h>
-
 /* ------------------------------------------------------------------ */
 /* Config                                                               */
 /* ------------------------------------------------------------------ */
 
 #define FC_CONFIG_FILE		"/etc/ppc64-diag/diag_fc.config"
-#define FC_CONFIG_MAX_KEYS	16
 #define FC_CONFIG_KEY_LEN	128
 
 /*
@@ -87,7 +84,7 @@ static void read_fc_config(struct fc_config *cfg)
 	char *line = NULL;
 	size_t line_sz = 0;
 	char key[FC_CONFIG_KEY_LEN];
-	long double val;
+	long val;
 
 	/* Safe defaults */
 	cfg->max_report_size_kb = 4096;
@@ -98,22 +95,28 @@ static void read_fc_config(struct fc_config *cfg)
 		return;		/* absent config is fine */
 
 	for (line_no = 1; getline(&line, &line_sz, fp) != -1; line_no++) {
-		/* Skip blank lines and comments */
-		if (sscanf(line, " %[\n\r#]", key))
-			continue;
+		/* Skip blank lines and comment lines */
+		{
+			const char *p = line;
+
+			while (*p == ' ' || *p == '\t')
+				p++;
+			if (*p == '#' || *p == '\n' || *p == '\r' || *p == '\0')
+				continue;
+		}
 
 		/* Width matches FC_CONFIG_KEY_LEN - 1 */
-		if (sscanf(line, " %127[^= ] = %Lf", key, &val) < 2) {
+		if (sscanf(line, " %127[^= ] = %ld", key, &val) < 2) {
 			fprintf(stderr,
-				"diag_fc: %s line %d: parse error: %s",
+				"diag_fc: %s line %d: parse error: %s\n",
 				FC_CONFIG_FILE, line_no, line);
 			continue;
 		}
 
 		if (!strcmp(key, "MAX_REPORT_SIZE_KB"))
-			cfg->max_report_size_kb = (long)val;
+			cfg->max_report_size_kb = val;
 		else if (!strcmp(key, "MPATH_ENABLED"))
-			cfg->mpath_enabled = (val != 0.0L) ? 1 : 0;
+			cfg->mpath_enabled = (val != 0) ? 1 : 0;
 	}
 
 	free(line);
@@ -851,6 +854,8 @@ int collect_fc_incident(const char *pci_addr,
 	struct tm tm_utc;
 	char timebuf[FIELD_LEN];
 
+	(void)cfg;	/* consumed by collect_mpath_devices() in a later task */
+
 	if (!pci_addr || !*pci_addr || !inc)
 		return -1;
 
@@ -982,6 +987,8 @@ int write_fc_report(const struct fc_incident *inc, const char *path,
 	FILE *f;
 	int i;
 	bool to_stdout;
+
+	(void)cfg;	/* consumed by size-advisory check in a later task */
 
 	if (!inc)
 		return -1;
