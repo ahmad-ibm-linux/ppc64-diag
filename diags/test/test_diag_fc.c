@@ -255,7 +255,7 @@ static void test_cstatus_fit(void)
 }
 
 /* ------------------------------------------------------------------ */
-/* 7. New struct sizes and zero-initialization (fc_statistics,         */
+/* 8. New struct sizes and zero-initialization (fc_statistics,         */
 /*    fc_remote_port, multipath_device)                                */
 /* ------------------------------------------------------------------ */
 
@@ -287,6 +287,7 @@ static void test_new_structs(void)
 	CHECK(rp.port_id[0] == '\0',    "fc_remote_port.port_id initializes empty");
 	CHECK(rp.port_name[0] == '\0',  "fc_remote_port.port_name initializes empty");
 	CHECK(rp.port_state[0] == '\0', "fc_remote_port.port_state initializes empty");
+	CHECK(rp.roles[0]     == '\0',  "fc_remote_port.roles initializes empty");
 
 	/* multipath_device */
 	struct multipath_device md;
