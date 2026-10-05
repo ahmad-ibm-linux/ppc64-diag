@@ -255,6 +255,63 @@ static void test_cstatus_fit(void)
 }
 
 /* ------------------------------------------------------------------ */
+/* 7. New struct sizes and zero-initialization (fc_statistics,         */
+/*    fc_remote_port, multipath_device)                                */
+/* ------------------------------------------------------------------ */
+
+static void test_new_structs(void)
+{
+	printf("\n[8] New struct sizes and zero-initialization\n");
+
+	/* fc_statistics */
+	struct fc_statistics stats;
+	memset(&stats, 0, sizeof(stats));
+	CHECK(sizeof(stats.error_frames)  == FIELD_LEN, "fc_statistics.error_frames matches FIELD_LEN");
+	CHECK(sizeof(stats.dumped_frames) == FIELD_LEN, "fc_statistics.dumped_frames matches FIELD_LEN");
+	CHECK(stats.error_frames[0]  == '\0', "fc_statistics.error_frames initializes empty");
+	CHECK(stats.dumped_frames[0] == '\0', "fc_statistics.dumped_frames initializes empty");
+
+	/* fc_port embeds fc_statistics */
+	struct fc_port port;
+	memset(&port, 0, sizeof(port));
+	CHECK(sizeof(port.stats) == sizeof(struct fc_statistics),
+	      "fc_port.stats has correct size");
+
+	/* fc_remote_port */
+	struct fc_remote_port rp;
+	memset(&rp, 0, sizeof(rp));
+	CHECK(sizeof(rp.port_id)    == FIELD_LEN, "fc_remote_port.port_id matches FIELD_LEN");
+	CHECK(sizeof(rp.port_name)  == WWN_LEN,   "fc_remote_port.port_name matches WWN_LEN");
+	CHECK(sizeof(rp.port_state) == FIELD_LEN, "fc_remote_port.port_state matches FIELD_LEN");
+	CHECK(sizeof(rp.roles)      == ROLES_LEN, "fc_remote_port.roles matches ROLES_LEN");
+	CHECK(rp.port_id[0] == '\0',    "fc_remote_port.port_id initializes empty");
+	CHECK(rp.port_name[0] == '\0',  "fc_remote_port.port_name initializes empty");
+	CHECK(rp.port_state[0] == '\0', "fc_remote_port.port_state initializes empty");
+
+	/* multipath_device */
+	struct multipath_device md;
+	memset(&md, 0, sizeof(md));
+	CHECK(sizeof(md.dm_name)  == MPATH_DEV_NAME_LEN, "multipath_device.dm_name matches MPATH_DEV_NAME_LEN");
+	CHECK(sizeof(md.dev_name) == MPATH_DEV_NAME_LEN, "multipath_device.dev_name matches MPATH_DEV_NAME_LEN");
+	CHECK(md.dm_name[0]  == '\0', "multipath_device.dm_name initializes empty");
+	CHECK(md.dev_name[0] == '\0', "multipath_device.dev_name initializes empty");
+
+	/* fc_incident now holds remote_ports and mpath_devices arrays */
+	struct fc_incident inc;
+	memset(&inc, 0, sizeof(inc));
+	CHECK(inc.num_remote_ports   == 0, "fc_incident.num_remote_ports initializes 0");
+	CHECK(inc.num_mpath_devices  == 0, "fc_incident.num_mpath_devices initializes 0");
+	CHECK(sizeof(inc.remote_ports)   == MAX_REMOTE_PORTS  * sizeof(struct fc_remote_port),
+	      "fc_incident.remote_ports array matches MAX_REMOTE_PORTS");
+	CHECK(sizeof(inc.mpath_devices) == MAX_MPATH_DEVICES * sizeof(struct multipath_device),
+	      "fc_incident.mpath_devices array matches MAX_MPATH_DEVICES");
+
+	/* MAX_REMOTE_PORTS and MAX_MPATH_DEVICES sanity */
+	CHECK(MAX_REMOTE_PORTS  >= 8,  "MAX_REMOTE_PORTS >= 8");
+	CHECK(MAX_MPATH_DEVICES >= 4,  "MAX_MPATH_DEVICES >= 4");
+}
+
+/* ------------------------------------------------------------------ */
 /* main                                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -269,6 +326,7 @@ int main(void)
 	test_write_null_args();
 	test_write_zeroed_struct();
 	test_cstatus_fit();
+	test_new_structs();
 
 	printf("\n=== Results: %d passed, %d failed ===\n", g_pass, g_fail);
 	return g_fail == 0 ? 0 : 1;
