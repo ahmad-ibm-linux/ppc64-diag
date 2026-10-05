@@ -40,6 +40,11 @@
 #define FIELD_LEN		64	/* generic short field */
 #define LOCATION_LENGTH		80
 #define DESCR_LENGTH		1024
+#define FC_HOST_STATS_ATTRS	2	/* error_frames, dumped_frames */
+#define MAX_REMOTE_PORTS	32
+#define MAX_MPATH_DEVICES	16
+#define MPATH_DEV_NAME_LEN	32
+#define ROLES_LEN		64
 
 /* ------------------------------------------------------------------ */
 /* Collection status                                                    */
@@ -58,6 +63,17 @@
 /* ------------------------------------------------------------------ */
 /* Per-port information                                                 */
 /* ------------------------------------------------------------------ */
+
+/*
+ * struct fc_statistics - Error counters from /sys/class/fc_host/hostX/statistics/.
+ *
+ * Fields are stored as strings to match the existing fc_port convention.
+ * "unknown" is used when the sysfs attribute cannot be read.
+ */
+struct fc_statistics {
+	char error_frames[FIELD_LEN];
+	char dumped_frames[FIELD_LEN];
+};
 
 /*
  * struct fc_port - All sysfs-readable information for one FC host/port.
@@ -79,6 +95,32 @@ struct fc_port {
 	char fabric_name[FIELD_LEN];
 	bool pci_function_present;
 	bool fc_host_present;
+	struct fc_statistics stats;
+};
+
+/*
+ * struct fc_remote_port - Minimal identity for one remote FC port.
+ *
+ * Sourced from /sys/class/fc_remote_ports/rport-X:Y-Z/.
+ * Kept minimal: enough to identify the port if it goes down.
+ */
+struct fc_remote_port {
+	char port_id[FIELD_LEN];
+	char port_name[WWN_LEN];	/* WWPN */
+	char port_state[FIELD_LEN];
+	char roles[ROLES_LEN];
+};
+
+/*
+ * struct multipath_device - Minimal record of one dm-multipath device.
+ *
+ * dm_name: kernel dm device name, e.g. "dm-3".
+ * dev_name: one FC-backed block device slave, e.g. "sdb".
+ *           There may be multiple slaves; we record the first one found.
+ */
+struct multipath_device {
+	char dm_name[MPATH_DEV_NAME_LEN];
+	char dev_name[MPATH_DEV_NAME_LEN];
 };
 
 /* ------------------------------------------------------------------ */
@@ -143,6 +185,14 @@ struct fc_incident {
 	struct fc_port ports[MAX_FC_PORTS];
 	int num_ports;
 
+	/* --- remote ports visible at failure time --- */
+	struct fc_remote_port remote_ports[MAX_REMOTE_PORTS];
+	int num_remote_ports;
+
+	/* --- dm-multipath devices backed by this adapter --- */
+	struct multipath_device mpath_devices[MAX_MPATH_DEVICES];
+	int num_mpath_devices;
+
 	/* --- IBM location code --- */
 	char location_code[LOCATION_LENGTH];
 
@@ -156,6 +206,8 @@ struct fc_incident {
 /* Public API                                                           */
 /* ------------------------------------------------------------------ */
 
+struct fc_config;	/* defined in diag_fc.c; opaque to callers */
+
 /*
  * collect_fc_incident - Collect FC adapter failure evidence.
  *
@@ -164,6 +216,7 @@ struct fc_incident {
  * @trigger_source:    what generated the trigger, e.g. "platform"
  * @trigger_reason:    human-readable failure reason
  * @trigger_timestamp: ISO 8601 event time; NULL uses collection time
+ * @cfg:               optional configuration, or NULL for defaults
  * @out:               caller-supplied incident struct to fill
  *
  * Performs only read-only sysfs and device-tree access.
@@ -176,6 +229,7 @@ int collect_fc_incident(const char *pci_addr,
 			const char *trigger_source,
 			const char *trigger_reason,
 			const char *trigger_timestamp,
+			const struct fc_config *cfg,
 			struct fc_incident *out);
 
 /*
@@ -183,9 +237,11 @@ int collect_fc_incident(const char *pci_addr,
  *
  * @inc:  completed incident struct
  * @path: output file path; NULL or "-" writes to stdout
+ * @cfg:  optional configuration, or NULL for defaults
  *
  * Returns 0 on success, -1 on error.
  */
-int write_fc_report(const struct fc_incident *inc, const char *path);
+int write_fc_report(const struct fc_incident *inc, const char *path,
+		    const struct fc_config *cfg);
 
 #endif /* _DIAG_FC_H */
