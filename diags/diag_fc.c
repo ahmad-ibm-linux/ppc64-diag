@@ -55,6 +55,70 @@
 #include "diag_fc.h"
 #include "platform.h"
 #include "utils.h"
+#include <ctype.h>
+
+/* ------------------------------------------------------------------ */
+/* Config                                                               */
+/* ------------------------------------------------------------------ */
+
+#define FC_CONFIG_FILE		"/etc/ppc64-diag/diag_fc.config"
+#define FC_CONFIG_MAX_KEYS	16
+#define FC_CONFIG_KEY_LEN	128
+
+/*
+ * struct fc_config - Parsed settings from FC_CONFIG_FILE.
+ */
+struct fc_config {
+	long          max_report_size_kb;	/* 0 = no limit */
+	int           mpath_enabled;		/* 1 = collect, 0 = skip */
+};
+
+/*
+ * read_fc_config - Parse FC_CONFIG_FILE into cfg.
+ *
+ * Uses the same key=value format as diag_nvme.config.
+ * Silently uses defaults if the file is absent or a key is unrecognised.
+ * Logs a warning to stderr on parse errors (bad lines) but continues.
+ */
+static void read_fc_config(struct fc_config *cfg)
+{
+	FILE *fp;
+	int line_no;
+	char *line = NULL;
+	size_t line_sz = 0;
+	char key[FC_CONFIG_KEY_LEN];
+	long double val;
+
+	/* Safe defaults */
+	cfg->max_report_size_kb = 4096;
+	cfg->mpath_enabled      = 1;
+
+	fp = fopen(FC_CONFIG_FILE, "r");
+	if (!fp)
+		return;		/* absent config is fine */
+
+	for (line_no = 1; getline(&line, &line_sz, fp) != -1; line_no++) {
+		/* Skip blank lines and comments */
+		if (sscanf(line, " %[\n\r#]", key))
+			continue;
+
+		/* Width matches FC_CONFIG_KEY_LEN - 1 */
+		if (sscanf(line, " %127[^= ] = %Lf", key, &val) < 2) {
+			fprintf(stderr,
+				"diag_fc: %s line %d: parse error: %s",
+				FC_CONFIG_FILE, line_no, line);
+			continue;
+		}
+
+		if (!strcmp(key, "MAX_REPORT_SIZE_KB"))
+			cfg->max_report_size_kb = (long)val;
+		else if (!strcmp(key, "MPATH_ENABLED"))
+			cfg->mpath_enabled = (val != 0.0L) ? 1 : 0;
+	}
+
+	free(line);
+	fclose(fp);
+}
 
 /* ------------------------------------------------------------------ */
 /* Private path constants                                               */
@@ -778,6 +842,7 @@ int collect_fc_incident(const char *pci_addr,
 			const char *trigger_source,
 			const char *trigger_reason,
 			const char *trigger_timestamp,
+			const struct fc_config *cfg,
 			struct fc_incident *inc)
 {
 	char siblings[MAX_FC_PORTS][PCI_ADDR_LEN];
@@ -911,7 +976,8 @@ static void json_str(FILE *f, const char *s)
 	fputc('"', f);
 }
 
-int write_fc_report(const struct fc_incident *inc, const char *path)
+int write_fc_report(const struct fc_incident *inc, const char *path,
+		    const struct fc_config *cfg)
 {
 	FILE *f;
 	int i;
@@ -1066,6 +1132,9 @@ int main(int argc, char *argv[])
 	const char *trig_ts      = NULL;
 	const char *outfile      = "-";
 	struct fc_incident inc;
+	struct fc_config cfg;
+
+	read_fc_config(&cfg);
 
 	static struct option long_options[] = {
 		{"pci",       required_argument, NULL, 'p'},
@@ -1105,12 +1174,12 @@ int main(int argc, char *argv[])
 	}
 
 	if (collect_fc_incident(pci_addr, trigger_type, source,
-				reason, trig_ts, &inc) != 0) {
+				reason, trig_ts, &cfg, &inc) != 0) {
 		fprintf(stderr, "diag_fc: fatal collection error\n");
 		return 2;
 	}
 
-	if (write_fc_report(&inc, outfile) != 0) {
+	if (write_fc_report(&inc, outfile, &cfg) != 0) {
 		fprintf(stderr, "diag_fc: report writing failed\n");
 		return 3;
 	}
