@@ -168,6 +168,7 @@ info "Scenario 1 report: $OUT1"
 # For true EEH error injection, use the errinjct tool instead:        #
 # TODO: document errinjct usage once reviewer provides details.       #
 # ================================================================== #
+OUT2=""
 if [[ "${EEH_TEST_ALLOW:-0}" != "1" ]]; then
     skip "Scenario 2 (driver unbind) — set EEH_TEST_ALLOW=1 to enable"
     echo "  INFO  Skipping Scenario 2: EEH_TEST_ALLOW not set."
@@ -250,7 +251,7 @@ fi
 fi  # EEH_TEST_ALLOW
 
 echo ""
-info "Scenario 2 report: $OUT2"
+[[ -n "$OUT2" ]] && info "Scenario 2 report: $OUT2"
 
 
 # ================================================================== #
@@ -331,7 +332,7 @@ else
     echo "SOME CHECKS FAILED — review output above"
     echo ""
     echo "Quick inspect:"
-    echo "  python3 -c \"import json,pprint; pprint.pprint(json.load(open('$OUT2')))\"  # unbound"
+    [[ -n "$OUT2" ]] && echo "  python3 -c \"import json,pprint; pprint.pprint(json.load(open('$OUT2')))\"  # unbound"
     echo "  python3 -c \"import json,pprint; pprint.pprint(json.load(open('$OUT3')))\"  # gone"
     exit 1
 fi
