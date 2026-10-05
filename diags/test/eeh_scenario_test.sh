@@ -159,6 +159,20 @@ info "Scenario 1 report: $OUT1"
 # SCENARIO 2: UNBOUND — driver detached, PCI dir still present       #
 # Simulates EEH frozen slot: hardware alive but driver torn down      #
 # ================================================================== #
+# ================================================================== #
+# SCENARIO 2 safety guard                                             #
+# Driver unbind/rebind is disruptive — do NOT run on production       #
+# machines without explicit opt-in.                                   #
+# Set EEH_TEST_ALLOW=1 to enable this scenario.                       #
+#                                                                     #
+# For true EEH error injection, use the errinjct tool instead:        #
+# TODO: document errinjct usage once reviewer provides details.       #
+# ================================================================== #
+if [[ "${EEH_TEST_ALLOW:-0}" != "1" ]]; then
+    skip "Scenario 2 (driver unbind) — set EEH_TEST_ALLOW=1 to enable"
+    echo "  INFO  Skipping Scenario 2: EEH_TEST_ALLOW not set."
+    echo "  INFO  To run: EEH_TEST_ALLOW=1 bash $0"
+else
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "SCENARIO 2: DRIVER UNBOUND (EEH frozen / driver torn down)"
@@ -232,6 +246,8 @@ else
     sleep 2   # wait for fc_host to come back up
     echo "  INFO  rebind complete"
 fi
+
+fi  # EEH_TEST_ALLOW
 
 echo ""
 info "Scenario 2 report: $OUT2"
