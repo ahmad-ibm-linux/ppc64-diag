@@ -439,6 +439,8 @@ static void collect_port(const char *pci_addr, struct fc_port *port)
 		snprintf(port->speed,            sizeof(port->speed),            "unknown");
 		snprintf(port->supported_speeds, sizeof(port->supported_speeds), "unknown");
 		snprintf(port->fabric_name,      sizeof(port->fabric_name),      "unknown");
+		snprintf(port->stats.error_frames,  sizeof(port->stats.error_frames),  "unknown");
+		snprintf(port->stats.dumped_frames, sizeof(port->stats.dumped_frames), "unknown");
 		port->fc_host_present = false;
 		return;
 	}
@@ -465,6 +467,24 @@ static void collect_port(const char *pci_addr, struct fc_port *port)
 	RD("fabric_name",      fabric_name);
 
 #undef RD
+
+/* Helper: build FC statistics sysfs path and read into port->stats.field */
+#define RDST(attr, field) \
+	do { \
+		rc = snprintf(path, sizeof(path), "%s/%s/statistics/%s", \
+			      FC_SYS_PATH, port->fc_host, (attr)); \
+		if (rc > 0 && (size_t)rc < sizeof(path)) \
+			safe_read(path, port->stats.field, \
+				  sizeof(port->stats.field)); \
+		else \
+			snprintf(port->stats.field, \
+				 sizeof(port->stats.field), "unknown"); \
+	} while (0)
+
+	RDST("error_frames",  error_frames);
+	RDST("dumped_frames", dumped_frames);
+
+#undef RDST
 }
 
 /* ------------------------------------------------------------------ */
