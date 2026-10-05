@@ -1214,8 +1214,6 @@ int write_fc_report(const struct fc_incident *inc, const char *path,
 	int i;
 	bool to_stdout;
 
-	(void)cfg;	/* consumed by size-advisory check in a later task */
-
 	if (!inc)
 		return -1;
 
@@ -1298,8 +1296,40 @@ int write_fc_report(const struct fc_incident *inc, const char *path,
 		fprintf(f, "      \"port_id\": ");             json_str(f, p->port_id);          fprintf(f, ",\n");
 		fprintf(f, "      \"speed\": ");               json_str(f, p->speed);            fprintf(f, ",\n");
 		fprintf(f, "      \"supported_speeds\": ");    json_str(f, p->supported_speeds); fprintf(f, ",\n");
-		fprintf(f, "      \"fabric_name\": ");         json_str(f, p->fabric_name);      fprintf(f, "\n");
+		fprintf(f, "      \"fabric_name\": ");         json_str(f, p->fabric_name);      fprintf(f, ",\n");
+		fprintf(f, "      \"statistics\": {\n");
+		fprintf(f, "        \"error_frames\": ");  json_str(f, p->stats.error_frames);  fprintf(f, ",\n");
+		fprintf(f, "        \"dumped_frames\": "); json_str(f, p->stats.dumped_frames); fprintf(f, "\n");
+		fprintf(f, "      }\n");
 		fprintf(f, "    }%s\n", (i < inc->num_ports - 1) ? "," : "");
+	}
+	fprintf(f, "  ],\n");
+
+	/* --- Remote ports --- */
+	fprintf(f, "  \"remote_ports\": [\n");
+	for (i = 0; i < inc->num_remote_ports; i++) {
+		const struct fc_remote_port *rp = &inc->remote_ports[i];
+
+		fprintf(f, "    {\n");
+		fprintf(f, "      \"port_id\": ");    json_str(f, rp->port_id);    fprintf(f, ",\n");
+		fprintf(f, "      \"port_name\": ");  json_str(f, rp->port_name);  fprintf(f, ",\n");
+		fprintf(f, "      \"port_state\": "); json_str(f, rp->port_state); fprintf(f, ",\n");
+		fprintf(f, "      \"roles\": ");      json_str(f, rp->roles);      fprintf(f, "\n");
+		fprintf(f, "    }%s\n",
+			(i < inc->num_remote_ports - 1) ? "," : "");
+	}
+	fprintf(f, "  ],\n");
+
+	/* --- Mpath devices --- */
+	fprintf(f, "  \"mpath_devices\": [\n");
+	for (i = 0; i < inc->num_mpath_devices; i++) {
+		const struct multipath_device *md = &inc->mpath_devices[i];
+
+		fprintf(f, "    {\n");
+		fprintf(f, "      \"dm_name\": ");  json_str(f, md->dm_name);  fprintf(f, ",\n");
+		fprintf(f, "      \"dev_name\": "); json_str(f, md->dev_name); fprintf(f, "\n");
+		fprintf(f, "    }%s\n",
+			(i < inc->num_mpath_devices - 1) ? "," : "");
 	}
 	fprintf(f, "  ],\n");
 
@@ -1317,8 +1347,24 @@ int write_fc_report(const struct fc_incident *inc, const char *path,
 		return -1;
 	}
 
-	if (!to_stdout)
+	if (!to_stdout) {
 		fclose(f);
+
+		if (cfg && cfg->max_report_size_kb > 0) {
+			struct stat st;
+
+			if (stat(path, &st) == 0) {
+				long size_kb = (long)(st.st_size / 1024);
+
+				if (size_kb > cfg->max_report_size_kb)
+					fprintf(stderr,
+						"diag_fc: report %s is %ld KB, "
+						"exceeds MAX_REPORT_SIZE_KB=%ld\n",
+						path, size_kb,
+						cfg->max_report_size_kb);
+			}
+		}
+	}
 
 	return 0;
 }
