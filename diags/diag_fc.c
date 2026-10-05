@@ -587,6 +587,108 @@ static void collect_remote_ports(struct fc_incident *inc)
 }
 
 /* ------------------------------------------------------------------ */
+/* Multipath device collection                                          */
+/* ------------------------------------------------------------------ */
+
+#define BLOCK_SYS_PATH		"/sys/block"
+
+/*
+	* collect_mpath_devices - Find dm-multipath devices backed by this adapter.
+	*
+	* Scans /sys/block/dm-* entries.  For each dm device, reads its slaves/
+	* subdirectory.  If any slave's symlink resolves to a path containing one
+	* of the PCI addresses collected in inc->ports[], the dm device is recorded.
+	*
+	* Skipped entirely when cfg->mpath_enabled == 0.
+	* Fills inc->mpath_devices[] with dm_name and the first matching dev_name.
+	*/
+static void collect_mpath_devices(struct fc_incident *inc,
+				  const struct fc_config *cfg)
+{
+	DIR *dm_dir, *slave_dir;
+	struct dirent *dm_de, *sl_de;
+	char slave_path[PATH_MAX];
+	char resolved[PATH_MAX];
+	int i, rc;
+
+	if (!inc || !cfg)
+		return;
+
+	inc->num_mpath_devices = 0;
+
+	if (!cfg->mpath_enabled)
+		return;
+
+	dm_dir = opendir(BLOCK_SYS_PATH);
+	if (!dm_dir)
+		return;
+
+	while ((dm_de = readdir(dm_dir)) != NULL &&
+	       inc->num_mpath_devices < MAX_MPATH_DEVICES) {
+		if (strncmp(dm_de->d_name, "dm-", 3) != 0)
+			continue;
+
+		/* Open the slaves/ subdirectory of this dm device */
+		rc = snprintf(slave_path, sizeof(slave_path),
+			      "%s/%s/slaves", BLOCK_SYS_PATH, dm_de->d_name);
+		if (rc <= 0 || (size_t)rc >= sizeof(slave_path))
+			continue;
+
+		slave_dir = opendir(slave_path);
+		if (!slave_dir)
+			continue;
+
+		while ((sl_de = readdir(slave_dir)) != NULL) {
+			if (!strcmp(sl_de->d_name, ".") ||
+			    !strcmp(sl_de->d_name, ".."))
+				continue;
+
+			/*
+			 * Resolve the slave symlink to its canonical path
+			 * and check whether any collected PCI address appears
+			 * in that path.
+			 */
+			rc = snprintf(slave_path, sizeof(slave_path),
+				      "%s/%s/slaves/%s",
+				      BLOCK_SYS_PATH, dm_de->d_name,
+				      sl_de->d_name);
+			if (rc <= 0 || (size_t)rc >= sizeof(slave_path))
+				continue;
+
+			if (realpath(slave_path, resolved) == NULL)
+				continue;
+
+			for (i = 0; i < inc->num_ports; i++) {
+				if (strstr(resolved,
+					   inc->ports[i].pci_addr) == NULL)
+					continue;
+
+				/* This dm device is backed by our adapter */
+				{
+					struct multipath_device *md =
+					  &inc->mpath_devices[
+					    inc->num_mpath_devices];
+
+					snprintf(md->dm_name,
+						 sizeof(md->dm_name),
+						 "%s", dm_de->d_name);
+					snprintf(md->dev_name,
+						 sizeof(md->dev_name),
+						 "%s", sl_de->d_name);
+					inc->num_mpath_devices++;
+				}
+				break;	/* one entry per dm device */
+			}
+
+			if (inc->num_mpath_devices >= MAX_MPATH_DEVICES)
+				break;
+		}
+		closedir(slave_dir);
+	}
+	closedir(dm_dir);
+}
+
+/* ------------------------------------------------------------------ */
 /* VPD collection                                                       */
 /* ------------------------------------------------------------------ */
 
@@ -974,8 +1076,6 @@ int collect_fc_incident(const char *pci_addr,
 	struct tm tm_utc;
 	char timebuf[FIELD_LEN];
 
-	(void)cfg;	/* consumed by collect_mpath_devices() in a later task */
-
 	if (!pci_addr || !*pci_addr || !inc)
 		return -1;
 
@@ -1062,6 +1162,9 @@ int collect_fc_incident(const char *pci_addr,
 
 	/* Remote ports */
 	collect_remote_ports(inc);
+
+	/* Multipath devices (conditional on config) */
+	collect_mpath_devices(inc, cfg);
 
 	return 0;
 }
