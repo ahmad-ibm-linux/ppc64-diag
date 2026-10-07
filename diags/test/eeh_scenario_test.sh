@@ -137,7 +137,7 @@ echo "[1.4] Both ports fc_host_present and Online"
 FC_PRESENT=$(grep -c '"fc_host_present": true' "$OUT1" || true)
 [[ "$FC_PRESENT" -eq 2 ]] && pass "both ports fc_host_present: true (got $FC_PRESENT)" \
                            || fail "expected 2 fc_host_present:true (got $FC_PRESENT)"
-ONLINE=$(grep -c '"port_state": "Online"' "$OUT1" || true)
+ONLINE=$(python3 -c "import json; d=json.load(open('$OUT1')); print(sum(1 for p in d['ports'] if p.get('port_state') == 'Online'))" 2>/dev/null || echo 0)
 [[ "$ONLINE" -eq 2 ]] && pass "both ports Online" \
                        || fail "expected 2 Online ports (got $ONLINE)"
 
