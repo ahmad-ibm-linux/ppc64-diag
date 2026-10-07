@@ -86,7 +86,7 @@ struct fc_config {
  * Silently uses defaults if the file is absent or a key is unrecognised.
  * Logs a warning to stderr on parse errors (bad lines) but continues.
  */
-static void read_fc_config(struct fc_config *cfg)
+static void __attribute__((unused)) read_fc_config(struct fc_config *cfg)
 {
 	FILE *fp;
 	int line_no;
@@ -792,8 +792,14 @@ static int collect_vpd(const char *pci_addr, struct fc_adapter_vpd *vpd,
 					goto read_err;
 				if (read(fd, &kw_len, 1) < 1)
 					goto read_err;
-				if ((size_t)kw_len >= sizeof(data))
-					kw_len = (uint8_t)(sizeof(data) - 1);
+				/* kw_len is uint8_t (max 255); data is 256 bytes.
+				 * The cap below is unreachable but kept as a safety
+				 * guard.  Suppress the tautology warning explicitly. */
+	#pragma GCC diagnostic push
+	#pragma GCC diagnostic ignored "-Wtype-limits"
+				if (kw_len >= sizeof(data) - 1)
+					kw_len = (uint8_t)(sizeof(data) - 2);
+	#pragma GCC diagnostic pop
 				if (read(fd, data, kw_len) < kw_len)
 					goto read_err;
 				data[kw_len] = '\0';
