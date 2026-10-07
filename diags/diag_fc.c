@@ -40,6 +40,14 @@
  *           -o /tmp/diag_fc.json
  */
 
+/*
+ * All snprintf calls in this file intentionally truncate to fixed-size
+ * sysfs/VPD string buffers.  The truncation is safe: fields are always
+ * shorter than their buffer in practice, and truncation is preferable to
+ * a buffer overrun.
+ */
+#pragma GCC diagnostic ignored "-Wformat-truncation"
+
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -784,8 +792,8 @@ static int collect_vpd(const char *pci_addr, struct fc_adapter_vpd *vpd,
 					goto read_err;
 				if (read(fd, &kw_len, 1) < 1)
 					goto read_err;
-				if (kw_len > sizeof(data) - 1)
-					kw_len = sizeof(data) - 1;
+				if (kw_len >= sizeof(data))
+					kw_len = (uint8_t)(sizeof(data) - 1);
 				if (read(fd, data, kw_len) < kw_len)
 					goto read_err;
 				data[kw_len] = '\0';
