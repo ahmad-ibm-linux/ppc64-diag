@@ -792,7 +792,7 @@ static int collect_vpd(const char *pci_addr, struct fc_adapter_vpd *vpd,
 					goto read_err;
 				if (read(fd, &kw_len, 1) < 1)
 					goto read_err;
-				if (kw_len >= sizeof(data))
+				if ((size_t)kw_len >= sizeof(data))
 					kw_len = (uint8_t)(sizeof(data) - 1);
 				if (read(fd, data, kw_len) < kw_len)
 					goto read_err;
@@ -1382,6 +1382,8 @@ int write_fc_report(const struct fc_incident *inc, const char *path,
 /* main                                                                 */
 /* ------------------------------------------------------------------ */
 
+#ifndef DIAG_FC_NO_MAIN
+
 static void print_usage(const char *cmd)
 {
 	fprintf(stdout,
@@ -1474,3 +1476,5 @@ int main(int argc, char *argv[])
 
 	return 0;
 }
+
+#endif /* DIAG_FC_NO_MAIN */
