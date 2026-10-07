@@ -42,6 +42,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../diag_fc.h"
 
@@ -145,15 +146,15 @@ static void test_collect_null_args(void)
 	struct fc_incident inc;
 
 	/* NULL pci_addr must return -1 */
-	int rc = collect_fc_incident(NULL, "TEST", "manual", "", NULL, &inc);
+	int rc = collect_fc_incident(NULL, "TEST", "manual", "", NULL, NULL, &inc);
 	CHECK(rc == -1, "NULL pci_addr returns -1");
 
 	/* empty pci_addr must return -1 */
-	rc = collect_fc_incident("", "TEST", "manual", "", NULL, &inc);
+	rc = collect_fc_incident("", "TEST", "manual", "", NULL, NULL, &inc);
 	CHECK(rc == -1, "empty pci_addr returns -1");
 
 	/* NULL out struct must return -1 */
-	rc = collect_fc_incident("0155:90:00.0", "TEST", "manual", "", NULL, NULL);
+	rc = collect_fc_incident("0155:90:00.0", "TEST", "manual", "", NULL, NULL, NULL);
 	CHECK(rc == -1, "NULL out struct returns -1");
 }
 
